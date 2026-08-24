@@ -1,0 +1,15 @@
+{
+  "pools_disponibles": [
+    {
+      "nombre": "unmineable_predeterminado",
+      "url": "stratum+tcp://unmineable.com:3333",
+      "secret_billetera_asociada": "WALLET_BTC_PRINCIPAL"
+    },
+    {
+      "nombre": "binance_pool_respaldo",
+      "url": "stratum+tcp://://poolbinance.com",
+      "secret_billetera_asociada": "WALLET_BINANCE_MINER"
+    }
+  ],
+  "pool_activo_actual": "unmineable_predeterminado"
+}
