@@ -1,22 +1,24 @@
 name: Deploy Workflow Required - Generador de Estructura
 
 on:
-  workflow_dispatch: # Activa el botón manual de fácil acceso en la interfaz
+  workflow_dispatch: # Habilita el botón manual de fácil acceso
 
 jobs:
-  generate-files:
+  build-architecture:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Permiso requerido para escribir los archivos por ti
+      contents: write
     steps:
-    - name: 1. Clonar Repositorio
+    - name: 1. Clonar Repositorio en Rama Main
       uses: actions/checkout@v4
+      with:
+        ref: 'main'
 
-    - name: 2. Generar Estructura Completa de Archivos
+    - name: 2. Generar Archivos con Mapeo de Wallet_BTC y Wallet_BNB
       run: |
-        mkdir -p config templates .github/workflows
+        mkdir -p config templates
 
-        # Crear plantilla base del minero
+        # Crear plantilla base del ejecutable
         cat << 'EOF' > templates/miner_template.sh
         #!/bin/bash
         echo "============================================="
@@ -28,30 +30,32 @@ jobs:
         echo "💼 Utilizando Wallet: $WALLET_ACTIVA"
         EOF
 
-        # Crear el JSON central de configuración para evitar editar código
+        # Crear el JSON centralizado con los nombres exactos de tus Secrets
         cat << 'EOF' > config/pools.json
         {
           "pools_disponibles": [
             {
-              "nombre": "unmineable_predeterminado",
+              "nombre": "unmineable_bitcoin",
               "url": "stratum+tcp://unmineable.com:3333",
-              "secret_billetera_asociada": "WALLET_BTC_PRINCIPAL"
+              "secret_billetera_asociada": "Wallet_BTC"
             },
             {
-              "nombre": "binance_pool_respaldo",
+              "nombre": "binance_pool_bnb",
               "url": "stratum+tcp://://poolbinance.com",
-              "secret_billetera_asociada": "WALLET_BINANCE_MINER"
+              "secret_billetera_asociada": "Wallet_BNB"
             }
           ],
-          "pool_activo_actual": "unmineable_predeterminado"
+          "pool_activo_actual": "unmineable_bitcoin"
         }
         EOF
 
-        # Crear el Orquestador Permanente
+        # Crear el Orquestador Permanente mapeado a tus Secrets
         cat << 'EOF' > .github/workflows/orquestador-pools.yml
         name: Orquestador Automatizado de Pools
         on:
           push:
+            branches:
+              - 'main'
             paths:
               - 'config/pools.json'
         jobs:
@@ -60,17 +64,26 @@ jobs:
             steps:
             - name: Clonar Repositorio
               uses: actions/checkout@v4
+              with:
+                ref: 'main'
 
-            - name: Leer Pool Activo y Enlazar con Secrets
+            - name: Vincular Pool Activo con Secrets Especiales
               id: info_pool
               env:
-                WALLET_BTC_PRINCIPAL: ${{ secrets.WALLET_BTC_PRINCIPAL }}
-                WALLET_BINANCE_MINER: ${{ secrets.WALLET_BINANCE_MINER }}
+                Wallet_BTC: ${{ secrets.Wallet_BTC }}
+                Wallet_BNB: ${{ secrets.Wallet_BNB }}
               run: |
+                # 1. Leer el pool configurado en el archivo JSON
                 POOL_ACTIVO=$(jq -r '.pool_activo_actual' config/pools.json)
+                
+                # 2. Extraer los parámetros técnicos (URL y Nombre del Secret requerido)
                 URL_POOL=$(jq -r --arg POOL "$POOL_ACTIVO" '.pools_disponibles[] | select(.nombre==$POOL) | .url' config/pools.json)
                 SECRET_NAME=$(jq -r --arg POOL "$POOL_ACTIVO" '.pools_disponibles[] | select(.nombre==$POOL) | .secret_billetera_asociada' config/pools.json)
+                
+                # 3. Extraer el valor real de la billetera desde las variables de entorno de GitHub
                 BILLETERA_REAL="${!SECRET_NAME}"
+                
+                # 4. Guardar variables globales para el siguiente paso
                 echo "url_final=$URL_POOL" >> $GITHUB_ENV
                 echo "billetera_final=$BILLETERA_REAL" >> $GITHUB_ENV
 
@@ -81,17 +94,17 @@ jobs:
                     templates/miner_template.sh > miner_listo.sh
                 chmod +x miner_listo.sh
 
-            - name: Publicar Archivo Listo
+            - name: Publicar Archivo Listo para Descargar
               uses: actions/upload-artifact@v4
               with:
                 name: script-minero-configurado
                 path: miner_listo.sh
         EOF
 
-    - name: 3. Guardar cambios en el Repositorio de forma automática
+    - name: 3. Guardar Estructura en el Repositorio Remoto
       run: |
         git config --global user.name "GitHub Action Bot"
         git config --global user.email "actions@github.com"
         git add config/pools.json templates/miner_template.sh .github/workflows/orquestador-pools.yml
-        git commit -m "infrastructure: generar archivos de la arquitectura de pools"
-        git push
+        git commit -m "infrastructure: mapear pools con secrets Wallet_BTC y Wallet_BNB"
+        git push origin main
