@@ -1,1 +1,11 @@
-
+services:
+  miner-node:
+    image: minerorg/xmrig:latest # Imagen oficial optimizada de minería
+    container_name: nodo_cripto_ingresos
+    restart: always
+    volumes:
+      - ./config.json:/etc/xmrig/config.json # Enlaza tu configuración editable
+    resources:
+      limits:
+        cpus: '0.80' # Usa máximo el 80% de la CPU para evitar penalizaciones del hosting
+        memory: 2G
