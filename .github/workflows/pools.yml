@@ -1,0 +1,47 @@
+name: Orquestador Automatizado de Pools
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - 'config/pools.json'
+jobs:
+  procesar-enlazamiento:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Clonar Repositorio
+      uses: actions/checkout@v4
+      with:
+        ref: 'main'
+
+    - name: Vincular Pool Activo con Secrets Especiales
+      id: info_pool
+      env:
+        Wallet_BTC: ${{ secrets.Wallet_BTC }}
+        Wallet_BNB: ${{ secrets.Wallet_BNB }}
+        Wallet_LTC: ${{ secrets.Wallet_LTC }}
+        Wallet_ETC: ${{ secrets.Wallet_ETC }}
+        Wallet_DOGE: ${{ secrets.Wallet_DOGE }}
+        Wallet_RVN: ${{ secrets.Wallet_RVN }}
+      run: |
+        POOL_ACTIVO=$(jq -r '.pool_activo_actual' config/pools.json)
+        URL_POOL=$(jq -r --arg POOL "$POOL_ACTIVO" '.pools_disponibles[] | select(.nombre==$POOL) | .url' config/pools.json)
+        SECRET_NAME=$(jq -r --arg POOL "$POOL_ACTIVO" '.pools_disponibles[] | select(.nombre==$POOL) | .secret_billetera_asociada' config/pools.json)
+        
+        BILLETERA_REAL="${!SECRET_NAME}"
+        
+        echo "url_final=$URL_POOL" >> $GITHUB_ENV
+        echo "billetera_final=$BILLETERA_REAL" >> $GITHUB_ENV
+
+    - name: Generar Archivo de Minería Final
+      run: |
+        sed -e "s|POOL_URL_REPLACE|$url_final|g" \
+            -e "s|WALLET_REPLACE|$billetera_final|g" \
+            templates/miner_template.sh > miner_listo.sh
+        chmod +x miner_listo.sh
+
+    - name: Publicar Archivo Listo para Descargar
+      uses: actions/upload-artifact@v4
+      with:
+        name: script-minero-configurado
+        path: miner_listo.sh
