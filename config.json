@@ -1,0 +1,17 @@
+{
+    "autosave": true,
+    "cpu": true,
+    "opencl": false,
+    "cuda": false,
+    "pools": [
+        {
+            "algo": "rx/0",
+            "url": "gulf.moneroocean.stream:10128",
+            "user": "TU_BILLETERA_AQUI",
+            "pass": "nodo_cloud_01",
+            "rig-id": "nodo_cloud_01",
+            "keepalive": true,
+            "tls": true
+        }
+    ]
+}
