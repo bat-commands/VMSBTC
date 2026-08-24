@@ -1,2 +1,2 @@
-# -VMSBTC
+# VMSBTC
 Dockers/Nodes/Runs
