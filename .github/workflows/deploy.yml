@@ -1,7 +1,7 @@
 name: Deploy Workflow Required - Generador de Estructura
 
 on:
-  workflow_dispatch: # Habilita el botón manual de fácil acceso
+  workflow_dispatch: # Permite ejecución manual con un botón
 
 jobs:
   build-architecture:
@@ -14,11 +14,13 @@ jobs:
       with:
         ref: 'main'
 
-    - name: 2. Generar Archivos con Mapeo de Wallet_BTC y Wallet_BNB
+    - name: 2. Generar Archivos con Pools Preconfiguradas
       run: |
         mkdir -p config templates
 
-        # Crear plantilla base del ejecutable
+        # ==========================================
+        # CREACIÓN DE LA PLANTILLA DEL SCRIPT MINERO
+        # ==========================================
         cat << 'EOF' > templates/miner_template.sh
         #!/bin/bash
         echo "============================================="
@@ -30,7 +32,9 @@ jobs:
         echo "💼 Utilizando Wallet: $WALLET_ACTIVA"
         EOF
 
-        # Crear el JSON centralizado con los nombres exactos de tus Secrets
+        # ==========================================
+        # CREACIÓN DEL JSON CENTRALIZADO DE POOLS
+        # ==========================================
         cat << 'EOF' > config/pools.json
         {
           "pools_disponibles": [
@@ -43,13 +47,35 @@ jobs:
               "nombre": "binance_pool_bnb",
               "url": "stratum+tcp://://poolbinance.com",
               "secret_billetera_asociada": "Wallet_BNB"
+            },
+            {
+              "nombre": "litecoin_pool",
+              "url": "stratum+tcp://://poolbinance.com",
+              "secret_billetera_asociada": "Wallet_LTC"
+            },
+            {
+              "nombre": "etc_ethermine",
+              "url": "stratum+tcp://://2miners.com",
+              "secret_billetera_asociada": "Wallet_ETC"
+            },
+            {
+              "nombre": "dogecoin_unmineable",
+              "url": "stratum+tcp://://unmineable.com",
+              "secret_billetera_asociada": "Wallet_DOGE"
+            },
+            {
+              "nombre": "ravencoin_flypool",
+              "url": "stratum+tcp://stratum-ravencoin.flypool.org:3333",
+              "secret_billetera_asociada": "Wallet_RVN"
             }
           ],
           "pool_activo_actual": "unmineable_bitcoin"
         }
         EOF
 
-        # Crear el Orquestador Permanente mapeado a tus Secrets
+        # ==========================================
+        # CREACIÓN DEL ORQUESTADOR PERMANENTE
+        # ==========================================
         cat << 'EOF' > .github/workflows/orquestador-pools.yml
         name: Orquestador Automatizado de Pools
         on:
@@ -72,6 +98,10 @@ jobs:
               env:
                 Wallet_BTC: ${{ secrets.Wallet_BTC }}
                 Wallet_BNB: ${{ secrets.Wallet_BNB }}
+                Wallet_LTC: ${{ secrets.Wallet_LTC }}
+                Wallet_ETC: ${{ secrets.Wallet_ETC }}
+                Wallet_DOGE: ${{ secrets.Wallet_DOGE }}
+                Wallet_RVN: ${{ secrets.Wallet_RVN }}
               run: |
                 # 1. Leer el pool configurado en el archivo JSON
                 POOL_ACTIVO=$(jq -r '.pool_activo_actual' config/pools.json)
@@ -80,10 +110,10 @@ jobs:
                 URL_POOL=$(jq -r --arg POOL "$POOL_ACTIVO" '.pools_disponibles[] | select(.nombre==$POOL) | .url' config/pools.json)
                 SECRET_NAME=$(jq -r --arg POOL "$POOL_ACTIVO" '.pools_disponibles[] | select(.nombre==$POOL) | .secret_billetera_asociada' config/pools.json)
                 
-                # 3. Extraer el valor real de la billetera desde las variables de entorno de GitHub
+                # 3. Extraer el valor real de la billetera utilizando una referencia indirecta en Bash
                 BILLETERA_REAL="${!SECRET_NAME}"
                 
-                # 4. Guardar variables globales para el siguiente paso
+                # Guardar variables de entorno para el siguiente paso
                 echo "url_final=$URL_POOL" >> $GITHUB_ENV
                 echo "billetera_final=$BILLETERA_REAL" >> $GITHUB_ENV
 
@@ -106,5 +136,5 @@ jobs:
         git config --global user.name "GitHub Action Bot"
         git config --global user.email "actions@github.com"
         git add config/pools.json templates/miner_template.sh .github/workflows/orquestador-pools.yml
-        git commit -m "infrastructure: mapear pools con secrets Wallet_BTC y Wallet_BNB"
+        git commit -m "infrastructure: crear estructura completa con pools y secrets mapeados"
         git push origin main
