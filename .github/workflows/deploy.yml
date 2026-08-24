@@ -1,26 +1,28 @@
 name: Deploy Workflow Required - Generador de Estructura
 
 on:
-  workflow_dispatch: # Permite ejecución manual con un botón
+  workflow_dispatch:
+
+# Solución al Exit Code 1: Dar permisos explícitos de escritura al token de GitHub
+permissions:
+  contents: write
 
 jobs:
   build-architecture:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
+    # Actualizado a checkout@v4 (compatible con Node.js actuales)
     - name: 1. Clonar Repositorio en Rama Main
       uses: actions/checkout@v4
       with:
         ref: 'main'
+        fetch-depth: 0 # Trae todo el historial para evitar fallos de Git
 
     - name: 2. Generar Archivos con Pools Preconfiguradas
       run: |
         mkdir -p config templates
 
-        # ==========================================
-        # CREACIÓN DE LA PLANTILLA DEL SCRIPT MINERO
-        # ==========================================
+        # Creación de la plantilla del script minero
         cat << 'EOF' > templates/miner_template.sh
         #!/bin/bash
         echo "============================================="
@@ -32,9 +34,7 @@ jobs:
         echo "💼 Utilizando Wallet: $WALLET_ACTIVA"
         EOF
 
-        # ==========================================
-        # CREACIÓN DEL JSON CENTRALIZADO DE POOLS
-        # ==========================================
+        # Creación del JSON centralizado de pools
         cat << 'EOF' > config/pools.json
         {
           "pools_disponibles": [
@@ -55,7 +55,7 @@ jobs:
             },
             {
               "nombre": "etc_ethermine",
-              "url": "stratum+tcp://://2miners.com",
+              "url": "strtum+tcp://://2miners.com",
               "secret_billetera_asociada": "Wallet_ETC"
             },
             {
@@ -73,10 +73,8 @@ jobs:
         }
         EOF
 
-        # ==========================================
-        # CREACIÓN DEL ORQUESTADOR PERMANENTE
-        # ==========================================
-        cat << 'EOF' > .github/workflows/orquestador-pools.yml
+        # Creación del orquestador (pools.yml)
+        cat << 'EOF' > .github/workflows/pools.yml
         name: Orquestador Automatizado de Pools
         on:
           push:
@@ -98,22 +96,17 @@ jobs:
               env:
                 Wallet_BTC: ${{ secrets.Wallet_BTC }}
                 Wallet_BNB: ${{ secrets.Wallet_BNB }}
-                Wallet_LTC: ${{ secrets.Wallet_LTC }}
+                Wallet_LTC: ${{ secrets.Secrets.Wallet_LTC }}
                 Wallet_ETC: ${{ secrets.Wallet_ETC }}
                 Wallet_DOGE: ${{ secrets.Wallet_DOGE }}
                 Wallet_RVN: ${{ secrets.Wallet_RVN }}
               run: |
-                # 1. Leer el pool configurado en el archivo JSON
                 POOL_ACTIVO=$(jq -r '.pool_activo_actual' config/pools.json)
-                
-                # 2. Extraer los parámetros técnicos (URL y Nombre del Secret requerido)
                 URL_POOL=$(jq -r --arg POOL "$POOL_ACTIVO" '.pools_disponibles[] | select(.nombre==$POOL) | .url' config/pools.json)
                 SECRET_NAME=$(jq -r --arg POOL "$POOL_ACTIVO" '.pools_disponibles[] | select(.nombre==$POOL) | .secret_billetera_asociada' config/pools.json)
                 
-                # 3. Extraer el valor real de la billetera utilizando una referencia indirecta en Bash
                 BILLETERA_REAL="${!SECRET_NAME}"
                 
-                # Guardar variables de entorno para el siguiente paso
                 echo "url_final=$URL_POOL" >> $GITHUB_ENV
                 echo "billetera_final=$BILLETERA_REAL" >> $GITHUB_ENV
 
@@ -132,9 +125,19 @@ jobs:
         EOF
 
     - name: 3. Guardar Estructura en el Repositorio Remoto
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         git config --global user.name "GitHub Action Bot"
         git config --global user.email "actions@github.com"
-        git add config/pools.json templates/miner_template.sh .github/workflows/orquestador-pools.yml
-        git commit -m "infrastructure: crear estructura completa con pools y secrets mapeados"
-        git push origin main
+        
+        # Añadir archivos de forma segura
+        git add config/pools.json templates/miner_template.sh .github/workflows/pools.yml
+        
+        # Hacer commit sólo si hay cambios reales para evitar errores vacíos
+        if ! git diff --cached --quiet; then
+          git commit -m "infrastructure: estructurar pools y corregir permisos de escritura"
+          git push origin main
+        else
+          echo "No hay cambios nuevos que guardar."
+        fi
