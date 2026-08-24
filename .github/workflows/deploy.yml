@@ -3,7 +3,6 @@ name: Deploy Workflow Required - Generador de Estructura
 on:
   workflow_dispatch:
 
-# Solución al Exit Code 1: Dar permisos explícitos de escritura al token de GitHub
 permissions:
   contents: write
 
@@ -11,12 +10,10 @@ jobs:
   build-architecture:
     runs-on: ubuntu-latest
     steps:
-    # Actualizado a checkout@v4 (compatible con Node.js actuales)
     - name: 1. Clonar Repositorio en Rama Main
       uses: actions/checkout@v4
       with:
         ref: 'main'
-        fetch-depth: 0 # Trae todo el historial para evitar fallos de Git
 
     - name: 2. Generar Archivos con Pools Preconfiguradas
       run: |
@@ -73,7 +70,7 @@ jobs:
         }
         EOF
 
-        # Creación del orquestador (pools.yml)
+        # Creación del orquestador (pools.yml) - CORREGIDO EL TYPO DE WALLET_LTC
         cat << 'EOF' > .github/workflows/pools.yml
         name: Orquestador Automatizado de Pools
         on:
@@ -96,7 +93,7 @@ jobs:
               env:
                 Wallet_BTC: ${{ secrets.Wallet_BTC }}
                 Wallet_BNB: ${{ secrets.Wallet_BNB }}
-                Wallet_LTC: ${{ secrets.Secrets.Wallet_LTC }}
+                Wallet_LTC: ${{ secrets.Wallet_LTC }}
                 Wallet_ETC: ${{ secrets.Wallet_ETC }}
                 Wallet_DOGE: ${{ secrets.Wallet_DOGE }}
                 Wallet_RVN: ${{ secrets.Wallet_RVN }}
@@ -124,20 +121,9 @@ jobs:
                 path: miner_listo.sh
         EOF
 
-    - name: 3. Guardar Estructura en el Repositorio Remoto
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        git config --global user.name "GitHub Action Bot"
-        git config --global user.email "actions@github.com"
-        
-        # Añadir archivos de forma segura
-        git add config/pools.json templates/miner_template.sh .github/workflows/pools.yml
-        
-        # Hacer commit sólo si hay cambios reales para evitar errores vacíos
-        if ! git diff --cached --quiet; then
-          git commit -m "infrastructure: estructurar pools y corregir permisos de escritura"
-          git push origin main
-        else
-          echo "No hay cambios nuevos que guardar."
-        fi
+    - name: 3. Guardar Cambios de Forma Segura en el Repositorio
+      uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        commit_message: "infrastructure: estructurar pools y corregir sintaxis de variables"
+        branch: main
+        file_pattern: 'config/pools.json templates/miner_template.sh .github/workflows/pools.yml'
